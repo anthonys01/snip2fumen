@@ -2,7 +2,7 @@
 
 Python tool to screenshot Tetris boards and generate fumen strings from it
 
-##Description
+## Description
 
 snip2fumen is a python tool to take screenshots of your Tetris board and generate a fumen code with it (from [tetris-fumen](https://github.com/knewjade/tetris-fumen))
 
