@@ -108,9 +108,13 @@ class MyWidget(QtWidgets.QWidget):
         recog.FumenEncoder.to_fumen(g)
 
 
-if __name__ == '__main__':
+def main():
     app = QtWidgets.QApplication(sys.argv)
     window = MyWidget()
     window.show()
     app.aboutToQuit.connect(app.deleteLater)
     sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    main()

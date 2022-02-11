@@ -31,10 +31,10 @@ pip install -r requirements.txt
 
 ## Usage
 
-Once installation is done, just run snipe2fumen.py
+Once installation is done, run the snip2fumen module (you need to be in the same folder as this README)
 
 ```
-python snipe2fumen.py
+python -m snip2fumen
 ```
 
 Then use your mouse to select your game board (like any sniping tool).
