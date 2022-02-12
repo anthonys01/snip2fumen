@@ -23,8 +23,9 @@ import snip2fumen.recog as recog
 class MyWidget(QtWidgets.QWidget):
     cursorMove = QtCore.pyqtSignal(object)
 
-    def __init__(self):
+    def __init__(self, to_clipboard: bool = True):
         super().__init__()
+        self.to_clipboard = to_clipboard
         self.cursorMove.connect(self.handleCursorMove)
         self.timer = QtCore.QTimer(self)
         self.timer.setInterval(50)
@@ -78,8 +79,7 @@ class MyWidget(QtWidgets.QWidget):
             self.cursorMove.emit(pos)
 
     def handleCursorMove(self, pos):
-        # print(pos)
-        screen = QtWidgets.QApplication.instance().screenAt(pos)
+        screen: QScreen = QtWidgets.QApplication.instance().screenAt(pos)
         if screen != self.current_screen:
             self.current_screen = screen
             self.original_im = screen.grabWindow(0)
@@ -103,18 +103,16 @@ class MyWidget(QtWidgets.QWidget):
         ptr = image.bits()
         ptr.setsize(image.byteCount())
         img_array = np.array(ptr).reshape(height, width, 4)
-        br = recog.BoardRecognizer()
-        g = br.recognize(img_array)
-        recog.FumenEncoder.to_fumen(g)
+        recog.recog_image(img_array, self.to_clipboard)
 
 
-def main():
+def snipe_and_recog(to_clipboard: bool = True):
     app = QtWidgets.QApplication(sys.argv)
-    window = MyWidget()
+    window = MyWidget(to_clipboard)
     window.show()
     app.aboutToQuit.connect(app.deleteLater)
     sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
-    main()
+    snipe_and_recog()

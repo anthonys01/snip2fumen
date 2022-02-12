@@ -55,7 +55,6 @@ class FumenEncoder:
 
         fumen_url = "http://fumen.zui.jp/?" + mini_fumen.encode(field)
         print(fumen_url)
-        pyperclip.copy(fumen_url)
         return fumen_url
 
 
@@ -402,6 +401,14 @@ class BoardRecognizer:
         res = [[MathUtil.cartesian_to_polar(0, y)] for y in new_lines]
         p('Number of horizontal filtered lines:', len(res))
         return res
+
+
+def recog_image(img_array, to_clipboard=True):
+    br = BoardRecognizer()
+    g = br.recognize(img_array)
+    url = FumenEncoder.to_fumen(g)
+    if to_clipboard:
+        pyperclip.copy(url)
 
 
 if __name__ == "__main__":

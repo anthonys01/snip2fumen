@@ -23,6 +23,7 @@ The dependencies are listed in the requirements.txt files :
 * numpy
 * pyqt5
 * pyperclip
+* pillow
 
 Use pip to install them :
 ```
@@ -41,5 +42,10 @@ Then use your mouse to select your game board (like any sniping tool).
 The resulting fumen link will be printed as a result, and will be set in you clipboard.
 
 Should be working on all operating system, but was only tested on Windows 10.
+
+See more options :
+```
+python -m snip2fumen --help
+```
 
 Additionally, if you can run it, there is a standalone snip2fumen.exe executable in dist/.
