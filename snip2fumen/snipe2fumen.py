@@ -10,6 +10,7 @@ pyperclip
 """
 
 import sys
+import time
 from typing import Optional
 
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -65,6 +66,8 @@ class MyWidget(QtWidgets.QWidget):
         qp.setBrush(QtGui.QColor(0, 0, 0, 50))
         qp.drawRect(QtCore.QRect(QtCore.QPoint(0, 0), self.current_screen.geometry().size()))
 
+        if self.geometry().size() != self.current_screen.geometry().size():
+            self.resize(self.current_screen.geometry().size())
         self.label.setPixmap(self.im)
 
     def mousePressEvent(self, event):
