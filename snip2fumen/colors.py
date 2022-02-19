@@ -4,8 +4,9 @@ Colors, and color processing
 from typing import Union, Tuple, List, Dict
 
 import numpy as np
-from snip2fumen import p
-from snip2fumen.pieces import *
+
+from snip2fumen import prnt
+from snip2fumen.pieces import EMPTY, S_PIECE, Z_PIECE, O_PIECE, J_PIECE, L_PIECE, T_PIECE, I_PIECE, GARBAGE
 
 Color = Union[Tuple[float, float, float], Tuple[int, int, int]]
 
@@ -23,27 +24,36 @@ COLORS = {
 
 
 class ColorUtil:
+    """
+    color static class util
+    """
     @staticmethod
     def bgr_to_ycc(color_bgr: Color) -> Color:
-        b, g, r = color_bgr
-        b, g, r = b/255.0, g/255.0, r/255.0
-        y = .299 * r + .587 * g + .114 * b
-        cb = 128 - .168736 * r - .331364 * g + .5 * b
-        cr = 128 + .5 * r - .418688 * g - .081312 * b
-        return y, cb, cr
+        """
+        convert BGR to YCC color
+
+        :param color_bgr: BGR color
+        :return: YCC color
+        """
+        blue, green, red = color_bgr
+        blue, green, red = blue/255.0, green/255.0, red/255.0
+        y = .299 * red + .587 * green + .114 * blue
+        c_b = 128 - .168736 * red - .331364 * green + .5 * blue
+        c_r = 128 + .5 * red - .418688 * green - .081312 * blue
+        return y, c_b, c_r
 
     @staticmethod
-    def color_dist(c1: Color, c2: Color) -> float:
+    def color_dist(c_1: Color, c_2: Color) -> float:
         """
         Find the euclidean distance of two BGR colors in YUV color space
 
         Code from : https://stackoverflow.com/a/21886236
 
-        :param c1: bgr color
-        :param c2: bgr color
+        :param c_1: bgr color
+        :param c_2: bgr color
         :return: euclidean distance
         """
-        return sum((a - b) ** 2 for a, b in zip(ColorUtil.bgr_to_ycc(c1), ColorUtil.bgr_to_ycc(c2)))
+        return sum((a - b) ** 2 for a, b in zip(ColorUtil.bgr_to_ycc(c_1), ColorUtil.bgr_to_ycc(c_2)))
 
     @staticmethod
     def hashable(color_array: Union[np.ndarray[3, float], Color]) -> Color:
@@ -67,6 +77,7 @@ class ColorUtil:
         zero_mat[min_row[1], :] = False
         zero_mat[:, zero_index] = False
 
+    # pylint: disable=[too-many-locals,too-many-branches]
     @staticmethod
     def _mark_matrix(mat: np.ndarray[(int, int)], valid_rows: int):
         # Transform the matrix to boolean matrix(0 = True, others = False)
@@ -81,9 +92,9 @@ class ColorUtil:
         # Recording the row and column indexes separately.
         marked_zero_row: List[int] = []
         marked_zero_col: List[int] = []
-        for i in range(len(marked_zero)):
-            marked_zero_row.append(marked_zero[i][0])
-            marked_zero_col.append(marked_zero[i][1])
+        for marked in marked_zero:
+            marked_zero_row.append(marked[0])
+            marked_zero_col.append(marked[1])
         # step 2-2-1
         non_marked_row = list(set(range(valid_rows)) - set(marked_zero_row))
 
@@ -91,8 +102,8 @@ class ColorUtil:
         check_switch = True
         while check_switch:
             check_switch = False
-            for i in range(len(non_marked_row)):
-                row_array = zero_bool_mat[non_marked_row[i], :]
+            for row in non_marked_row:
+                row_array = zero_bool_mat[row, :]
                 for j in range(row_array.shape[0]):
                     # step 2-2-2
                     if row_array[j] and j not in marked_cols:
@@ -132,12 +143,13 @@ class ColorUtil:
                     if i not in cover_cols:
                         cur_mat[row, i] = cur_mat[row, i] - min_num
         # Step 4-3
-        for row in range(len(cover_rows)):
-            for col in range(len(cover_cols)):
-                cur_mat[cover_rows[row], cover_cols[col]] = cur_mat[cover_rows[row], cover_cols[col]] + min_num
+        for row in cover_rows:
+            for col in cover_cols:
+                cur_mat[row, col] = cur_mat[row, col] + min_num
 
         return cur_mat
 
+    # pylint: disable=[too-many-locals,too-many-branches]
     @staticmethod
     def _hungarian_algorithm(color_families: list) -> Dict[Color, Color]:
         """
@@ -167,18 +179,18 @@ class ColorUtil:
             cost_matrix[:, col] = cost_matrix[:, col] - np.min(cost_matrix[:, col])
 
         zero_count = 0
-        ans_pos = list()
+        ans_pos = []
         stop_condition = min(valid_rows, valid_columns)
         while zero_count < stop_condition:
             # Step 2 & 3
             ans_pos, marked_rows, marked_cols = ColorUtil._mark_matrix(cost_matrix, valid_rows)
             zero_count = len(marked_rows) + len(marked_cols)
-            p(ans_pos, marked_rows, marked_cols)
+            prnt(ans_pos, marked_rows, marked_cols)
 
             if zero_count < stop_condition:
                 cost_matrix = ColorUtil._adjust_matrix(cost_matrix, marked_rows, marked_cols, valid_rows, valid_columns)
 
-        mapping = dict()
+        mapping = {}
         for color, guess in ans_pos:
             mapping[color_families[color]] = colors_list[guess]
 
@@ -194,7 +206,7 @@ class ColorUtil:
         assigned_to_garbage = None
         color_pieces = [I_PIECE, T_PIECE, S_PIECE, Z_PIECE, J_PIECE, L_PIECE, O_PIECE]
         for color in color_to_guess:
-            p(f"Dist({color}, {color_to_guess[color]}) = {ColorUtil.color_dist(color, color_to_guess[color])}")
+            prnt(f"Dist({color}, {color_to_guess[color]}) = {ColorUtil.color_dist(color, color_to_guess[color])}")
             if color_to_guess[color] == EMPTY:
                 continue
             if color_to_guess[color] == GARBAGE:
@@ -206,10 +218,11 @@ class ColorUtil:
             color_to_guess[assigned_to_garbage] = \
                 min(color_pieces, key=lambda c: ColorUtil.color_dist(assigned_to_garbage, c))
         elif assigned_to_garbage:
-            d = ColorUtil.color_dist(assigned_to_garbage, GARBAGE)
-            if d > 0.1:
+            dist = ColorUtil.color_dist(assigned_to_garbage, GARBAGE)
+            if dist > 0.1:
                 color_to_guess[assigned_to_garbage] = EMPTY
 
+    # pylint: disable=[too-many-locals,too-many-branches]
     @staticmethod
     def map_colors(grid: np.ndarray[(int, int), Color]):
         """
@@ -223,7 +236,7 @@ class ColorUtil:
 
         Finally, map the old colors to the new in the grid.
         """
-        color_families = dict()
+        color_families = {}
         for i in range(grid.shape[0]):
             for j in range(grid.shape[1]):
                 color = ColorUtil.hashable(grid[i, j])
@@ -231,15 +244,15 @@ class ColorUtil:
                     color_families[color] = [color]
                 else:
                     found = False
-                    for family in color_families:
+                    for family, members in color_families.items():
                         if ColorUtil.color_dist(color, family) < 1e-2:
-                            color_families[family].append(color)
+                            members.append(color)
                             found = True
                             break
                     if not found:
                         color_families[color] = [color]
 
-        p(f"Color families found : {color_families.keys()}")
+        prnt(f"Color families found : {color_families.keys()}")
 
         families = list(color_families.keys())
 
@@ -250,17 +263,16 @@ class ColorUtil:
             families.remove(found_family)
 
         for left in families:
-            p(f"Family {left} was not matched anything defaulting to EMPTY")
+            prnt(f"Family {left} was not matched anything defaulting to EMPTY")
             map_color_to_guess[left] = EMPTY
 
-        for family in color_families:
+        for family, members in color_families.items():
             guess = map_color_to_guess[family]
-            for c in color_families[family]:
-                map_color_to_guess[c] = guess
+            for col in members:
+                map_color_to_guess[col] = guess
 
-        p(f"Final color mapping : {map_color_to_guess}")
+        prnt(f"Final color mapping : {map_color_to_guess}")
 
         for i in range(grid.shape[0]):
             for j in range(grid.shape[1]):
                 grid[i, j] = map_color_to_guess[ColorUtil.hashable(grid[i, j])]
-

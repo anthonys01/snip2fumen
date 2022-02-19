@@ -19,31 +19,57 @@ GRAY = 8
 
 
 class Buffer:
+    """
+    Encoder buffer
+    """
     tableLength = len(ENCODE_TABLE)
 
     def __init__(self):
-        self.values = list()
+        self.values = []
 
     def __len__(self):
         return len(self.values)
 
     def push(self, value: int, split_count: int = 1):
+        """
+        push value in buffer
+        :param value: to add to buffer
+        :param split_count: split count
+        """
         current = value
-        for count in range(split_count):
+        for _ in range(split_count):
             self.values.append(current % Buffer.tableLength)
             current = current // Buffer.tableLength
 
-    def merge(self, b):
-        for v in b.values:
-            self.values.append(v)
+    def merge(self, buffer):
+        """
+        merge given buffer with this one
+        :param buffer: buffer to merge
+        """
+        for val in buffer.values:
+            self.values.append(val)
 
-    def get(self, i):
-        return self.values[i]
+    def get(self, idx) -> int:
+        """
+        Get value at index
+        :param idx: index
+        :return: value
+        """
+        return self.values[idx]
 
-    def set(self, i, v):
-        self.values[i] = v
+    def set(self, idx: int, value: int):
+        """
+        Set value at given index
+        :param idx: index
+        :param value: value to set
+        """
+        self.values[idx] = value
 
-    def get_encoded_string(self):
+    def get_encoded_string(self) -> str:
+        """
+        Get buffer as encoded string
+        :return: encoded string
+        """
         return "".join([ENCODE_TABLE[v] for v in self.values])
 
 
@@ -54,21 +80,36 @@ FIELD_BLOCKS = FIELD_MAX_HEIGHT * FIELD_WIDTH
 
 
 class Field:
+    """
+    represents a Tetris field
+    """
     def __init__(self):
         self.field = [0] * (FIELD_TOP * FIELD_WIDTH)
         self.garbage = [0] * FIELD_WIDTH
 
     @staticmethod
     def index_for(x, y):
+        """
+         transform 2d coordinates to 1d
+        """
         return x + y * FIELD_WIDTH
 
     def get_number_at(self, x: int, y: int):
+        """
+        get value in field at (x,y) coordinates
+        """
         return self.field[Field.index_for(x, y)] if y >= 0 else self.garbage[Field.index_for(x, -(y + 1))]
 
     def set_number_field_at(self, x: int, y: int, value: int):
+        """
+        set value in field at (x,y) coordinates
+        """
         self.field[Field.index_for(x, y)] = value
 
     def clear_line(self):
+        """
+        Clear lines that need clearing
+        """
         new_field = self.field[:]
         top = len(new_field) // FIELD_WIDTH - 1
         for y in reversed(range(top + 1)):
@@ -85,22 +126,22 @@ class Field:
         self.field = new_field
 
 
-def encode_field(prev: Field, current: Field):
+def _encode_field(prev: Field, current: Field):
     buffer = Buffer()
 
-    def get_diff(xIndex, yIndex):
-        y = FIELD_TOP - yIndex - 1
-        return current.get_number_at(xIndex, y) - prev.get_number_at(xIndex, y) + 8
+    def get_diff(x_idx, y_idx) -> int:
+        y = FIELD_TOP - y_idx - 1
+        return current.get_number_at(x_idx, y) - prev.get_number_at(x_idx, y) + 8
 
-    def record_block_counts(d, c):
-        buffer.push(d * FIELD_BLOCKS + c, 2)
+    def record_block_counts(diff_value, count):
+        buffer.push(diff_value * FIELD_BLOCKS + count, 2)
 
     prev_diff = get_diff(0, 0)
     counter = -1
     changed = False
-    for yIndex in range(FIELD_MAX_HEIGHT):
-        for xIndex in range(FIELD_WIDTH):
-            diff = get_diff(xIndex, yIndex)
+    for y_index in range(FIELD_MAX_HEIGHT):
+        for x_index in range(FIELD_WIDTH):
+            diff = get_diff(x_index, y_index)
             if diff != prev_diff:
                 record_block_counts(prev_diff, counter)
                 counter = 0
@@ -113,12 +154,17 @@ def encode_field(prev: Field, current: Field):
     return changed, buffer
 
 
-def encode(field: Field):
+def encode(field: Field) -> str:
+    """
+    transform given field into fumen-encoded string
+    :param field: field to encode
+    :return: encoded string
+    """
     last_repeat = -1
     buffer = Buffer()
 
     def update_field(last_repeat_index, prev: Field, current: Field):
-        changed, values = encode_field(prev, current)
+        changed, values = _encode_field(prev, current)
 
         if changed:
             buffer.merge(values)

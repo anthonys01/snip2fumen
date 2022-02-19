@@ -10,17 +10,17 @@ pyperclip
 """
 
 import sys
-import time
 from typing import Optional
 
-from PyQt5 import QtWidgets, QtCore, QtGui
 import numpy as np
+from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtGui import QScreen, QPixmap
 from PyQt5.QtWidgets import QLabel, QGridLayout
-import snip2fumen.recog as recog
+from snip2fumen import recog
 
 
+# pylint: disable=[all]
 class MyWidget(QtWidgets.QWidget):
     cursorMove = QtCore.pyqtSignal(object)
 

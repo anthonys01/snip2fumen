@@ -1,10 +1,13 @@
-import cv2
+"""
+process command from command line
+"""
 import argparse
+import cv2
 from PIL import ImageGrab
 import numpy as np
 
 from snip2fumen.snipe2fumen import snipe_and_recog
-import snip2fumen.recog as recog
+from snip2fumen import recog
 
 
 if __name__ == '__main__':
