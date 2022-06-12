@@ -80,6 +80,7 @@ class BoardRecognizer:
         self.visualize = VISUALIZE
         self.acceptable_diff = ACCEPTABLE_DIFF
         self.max_lines_taken = MAX_LINES_TAKEN
+        self.raw_colors = False
 
     def recognize_file(self, file_path: str) -> np.ndarray[(int, int), Color]:
         """
@@ -110,6 +111,9 @@ class BoardRecognizer:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 20, 20, apertureSize=3)
 
+        if self.visualize:
+            DrawUtil.show_wait_destroy("Edges", edges)
+
         lines_ver: List[List[Line]] = self._process_verticals(img, edges, height)
         lines_hor: List[List[Line]] = self._process_horizontals(img, edges, width)
 
@@ -129,7 +133,8 @@ class BoardRecognizer:
 
             DrawUtil.show_wait_destroy("Grid before mapping", res)
 
-        ColorUtil.map_colors(grid)
+        if not self.raw_colors:
+            ColorUtil.map_colors(grid)
 
         if self.visualize:
             res = np.zeros(img.shape, np.uint8)
@@ -140,8 +145,7 @@ class BoardRecognizer:
         return grid
 
     @staticmethod
-    def _get_intersection_points(lines_hor: List[List[Line]], lines_ver: List[List[Line]]) -> \
-            np.ndarray((int, int), Tuple[int, int]):
+    def _get_intersection_points(lines_hor: List[List[Line]], lines_ver: List[List[Line]]):
         points, _ = np.meshgrid([None] * len(lines_ver), [None] * len(lines_hor))
 
         for i, hor_line in enumerate(lines_hor):
@@ -167,7 +171,11 @@ class BoardRecognizer:
 
         structuring_element = cv2.getStructuringElement(cv2.MORPH_RECT, (1, height // 30))
         vertical = cv2.erode(vertical, structuring_element)
+        if self.visualize:
+            DrawUtil.show_wait_destroy("Eroded", vertical)
         vertical = cv2.dilate(vertical, structuring_element)
+        if self.visualize:
+            DrawUtil.show_wait_destroy("Dilated", vertical)
         lines_ver: Union[np.ndarray[List[Line]], List[List[Line]]] = \
             cv2.HoughLines(vertical, 1, np.pi / 180, height // 4)
         if lines_ver is not None and lines_ver.any():
@@ -189,7 +197,11 @@ class BoardRecognizer:
 
         structuring_element = cv2.getStructuringElement(cv2.MORPH_RECT, (width // 30, 1))
         horizontal = cv2.erode(horizontal, structuring_element)
+        if self.visualize:
+            DrawUtil.show_wait_destroy("Eroded", horizontal)
         horizontal = cv2.dilate(horizontal, structuring_element)
+        if self.visualize:
+            DrawUtil.show_wait_destroy("Dilated", horizontal)
         lines_hor: Union[np.ndarray[List[Line]], List[List[Line]]] = \
             cv2.HoughLines(horizontal, 1, np.pi / 180, width // 4)
         if lines_hor is not None and lines_hor.any():

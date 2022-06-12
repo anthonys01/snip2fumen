@@ -9,7 +9,7 @@ MIN_WIDTH = 230
 COLORS_WANTED = True
 MAX_LINES_TAKEN = 20
 VISUALIZE = False
-LOGS = False
+LOGS = True
 
 
 def prnt(*args):

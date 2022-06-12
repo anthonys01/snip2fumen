@@ -1,7 +1,7 @@
 """
 Colors, and color processing
 """
-from typing import Union, Tuple, List, Dict
+from typing import Union, Tuple, List, Dict, Optional
 
 import numpy as np
 
@@ -151,7 +151,7 @@ class ColorUtil:
 
     # pylint: disable=[too-many-locals,too-many-branches]
     @staticmethod
-    def _hungarian_algorithm(color_families: list) -> Dict[Color, Color]:
+    def hungarian_algorithm(colors_list: List[Color], color_families: list) -> Dict[Color, Color]:
         """
         Match given colors to the normalized colors
 
@@ -159,7 +159,6 @@ class ColorUtil:
 
         :return: mapping from given colors to normalized colors
         """
-        colors_list = list(COLORS.keys())
 
         valid_rows = len(color_families)
         valid_columns = len(colors_list)
@@ -197,7 +196,28 @@ class ColorUtil:
         return mapping
 
     @staticmethod
-    def _fix_misattribution(color_to_guess: Dict[Color, Color]):
+    def get_family_to_remove(color_to_guess: Dict[Color, Color]):
+        assigned_to_garbage = None
+        color_pieces = [I_PIECE, T_PIECE, S_PIECE, Z_PIECE, J_PIECE, L_PIECE, O_PIECE]
+        for color in color_to_guess:
+            prnt(f"Dist({color}, {color_to_guess[color]}) = {ColorUtil.color_dist(color, color_to_guess[color])}")
+            if color_to_guess[color] == EMPTY:
+                continue
+            if color_to_guess[color] == GARBAGE:
+                assigned_to_garbage = color
+            else:
+                color_pieces.remove(color_to_guess[color])
+
+        if assigned_to_garbage:
+            dist = ColorUtil.color_dist(assigned_to_garbage, GARBAGE)
+            prnt(f"{assigned_to_garbage} with {dist=} to garbage")
+            if dist > 0.05 and \
+                    (abs(assigned_to_garbage[0] - assigned_to_garbage[1]) > 20 or
+                     abs(assigned_to_garbage[1] - assigned_to_garbage[2]) > 20):
+                return assigned_to_garbage
+
+    @staticmethod
+    def fix_misattribution(color_to_guess: Dict[Color, Color]):
         """
         If one color was assigned to GARBAGE, but there is still unused colors, reassign it.
 
@@ -214,27 +234,27 @@ class ColorUtil:
             else:
                 color_pieces.remove(color_to_guess[color])
 
-        if assigned_to_garbage and color_pieces:
-            color_to_guess[assigned_to_garbage] = \
-                min(color_pieces, key=lambda c: ColorUtil.color_dist(assigned_to_garbage, c))
-        elif assigned_to_garbage:
+        if assigned_to_garbage:
             dist = ColorUtil.color_dist(assigned_to_garbage, GARBAGE)
-            if dist > 0.1:
-                color_to_guess[assigned_to_garbage] = EMPTY
+            prnt(f"{assigned_to_garbage} with {dist=} to garbage")
+            if dist > 0.05 and \
+                    (abs(assigned_to_garbage[0] - assigned_to_garbage[1]) > 20 or
+                     abs(assigned_to_garbage[1] - assigned_to_garbage[2]) > 20):
+                if color_pieces:
+                    possible_color = min(color_pieces, key=lambda c: ColorUtil.color_dist(assigned_to_garbage, c))
+                    if ColorUtil.color_dist(assigned_to_garbage, possible_color) < 0.05:
+                        color_to_guess[assigned_to_garbage] = possible_color
+                    else:
+                        color_to_guess[assigned_to_garbage] = EMPTY
+                else:
+                    color_to_guess[assigned_to_garbage] = EMPTY
+                prnt(f"mis-assigned {assigned_to_garbage} to garbage,"
+                     f" assign back to {color_to_guess[assigned_to_garbage]}")
 
-    # pylint: disable=[too-many-locals,too-many-branches]
     @staticmethod
-    def map_colors(grid: np.ndarray[(int, int), Color]):
+    def extract_color_families(grid: np.ndarray[(int, int), Color]) -> Dict[Color, List[Color]]:
         """
-        Fill color grid with normalized block colors (that translate into board state)
-
-        Color comparisons are done in YUV color space.
-
-        First regroup all colors in the grid into several color "families".
-
-        Then, map these families to the block colors (all families with no association is mapped to EMPTY by default)
-
-        Finally, map the old colors to the new in the grid.
+            Extract all colors from grid and regroup them by families
         """
         color_families = {}
         for i in range(grid.shape[0]):
@@ -251,13 +271,52 @@ class ColorUtil:
                             break
                     if not found:
                         color_families[color] = [color]
+        return color_families
 
-        prnt(f"Color families found : {color_families.keys()}")
+    @staticmethod
+    def get_delta(color_map: Dict[Color, Color]) -> float:
+        to_compute = dict(color_map)
+        empty_to_remove = []
+        for color, guess in to_compute.items():
+            if guess == EMPTY and sum(color) > 30:
+                empty_to_remove.append(color)
+        for color in empty_to_remove:
+            to_compute.pop(color)
+        return sum((ColorUtil.color_dist(color, guess)
+                    for color, guess in to_compute.items())) / len(to_compute)
 
+    @staticmethod
+    def get_color_mapping(color_families: Dict[Color, List[Color]]) -> Dict[Color, Color]:
+        """
+            Mapping all found colors to guess colors
+        """
+        colors = list(COLORS.keys())
+        colors.remove(GARBAGE)
         families = list(color_families.keys())
+        possible_garbage = None
+        for color in families:
+            if color[0] > 0 and color[0] == color[1] == color[2]:
+                if possible_garbage is None or possible_garbage[0] < color[0]:
+                    possible_garbage = color
 
-        map_color_to_guess = ColorUtil._hungarian_algorithm(families)
-        ColorUtil._fix_misattribution(map_color_to_guess)
+        if possible_garbage:
+            families.remove(possible_garbage)
+
+        map_color_to_guess = ColorUtil.hungarian_algorithm(colors, families)
+        ColorUtil.fix_misattribution(map_color_to_guess)
+
+        if possible_garbage:
+            map_color_to_guess[possible_garbage] = GARBAGE
+            families.append(possible_garbage)
+        else:
+            prnt("Trying matching with the garbage")
+            map_color_to_guess_with_garbage = ColorUtil.hungarian_algorithm(list(COLORS.keys()), families)
+            ColorUtil.fix_misattribution(map_color_to_guess_with_garbage)
+            delta = ColorUtil.get_delta(map_color_to_guess)
+            delta_with_garbage = ColorUtil.get_delta(map_color_to_guess_with_garbage)
+            prnt(f'{delta_with_garbage=} | {delta=}')
+            if delta_with_garbage < delta:
+                map_color_to_guess = map_color_to_guess_with_garbage
 
         for found_family in map_color_to_guess:
             families.remove(found_family)
@@ -270,7 +329,24 @@ class ColorUtil:
             guess = map_color_to_guess[family]
             for col in members:
                 map_color_to_guess[col] = guess
+        return map_color_to_guess
 
+    @staticmethod
+    def map_colors(grid: np.ndarray[(int, int), Color]):
+        """
+        Fill color grid with normalized block colors (that translate into board state)
+
+        Color comparisons are done in YUV color space.
+
+        First regroup all colors in the grid into several color "families".
+
+        Then, map these families to the block colors (all families with no association is mapped to EMPTY by default)
+
+        Finally, map the old colors to the new in the grid.
+        """
+        color_families = ColorUtil.extract_color_families(grid)
+        prnt(f"Color families found : {color_families.keys()}")
+        map_color_to_guess = ColorUtil.get_color_mapping(color_families)
         prnt(f"Final color mapping : {map_color_to_guess}")
 
         for i in range(grid.shape[0]):

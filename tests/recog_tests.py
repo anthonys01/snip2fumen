@@ -45,6 +45,37 @@ class RegogTests(unittest.TestCase):
                          "phlwwAeg0whH8AeI8AeI8AeI8AeA8JeAgH"
                          )
 
+    def test_jstris4(self):
+        """
+        Test jstris 4
+        """
+        board_recog = BoardRecognizer()
+        grid = board_recog.recognize_file("./img/jstris4.png")
+        self.assertEqual(FumenEncoder.to_fumen(grid),
+                         "https://fumen.zui.jp/?v115@deRpHeRpPgAtwhGeBtwhBek0AtwwxhAeD8AeH8AeF8?JeAgH"
+                         )
+
+    def test_jstris5(self):
+        """
+        Test jstris 5
+        """
+        board_recog = BoardRecognizer()
+        grid = board_recog.recognize_file("./img/jstris5.png")
+        self.assertEqual(FumenEncoder.to_fumen(grid),
+                         "http://fumen.zui.jp/?v115@VgQ4zhAtDeR4RpBtCewwg0Q4RpAtglBexwi0ilCeww?E8AeI8AeI8AeI8AeD8JeAgH"
+                         )
+
+    def test_jstris6(self):
+        """
+        Test jstris 6
+        """
+        board_recog = BoardRecognizer()
+        grid = board_recog.recognize_file("./img/jstris6.png")
+        self.assertEqual(FumenEncoder.to_fumen(grid),
+                         "https://fumen.zui.jp/"
+                         "?v115@AfglGeilteh0EeglBeg0ywQ4ilA8AeN8AeH8AeK8Ae?G8AeD8AeO8AeJ8AeC8AeH8JeAgH"
+                         )
+
     def test_fourtris1(self):
         """
         Test fourtris 1
