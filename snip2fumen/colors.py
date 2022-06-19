@@ -217,22 +217,17 @@ class ColorUtil:
                 return assigned_to_garbage
 
     @staticmethod
-    def fix_misattribution(color_to_guess: Dict[Color, Color]):
-        """
-        If one color was assigned to GARBAGE, but there is still unused colors, reassign it.
-
-        If distance between the color and its attribution is too big, set it to EMPTY
-        """
+    def get_families_to_remove(color_to_guess: Dict[Color, Color]):
         assigned_to_garbage = None
-        color_pieces = [I_PIECE, T_PIECE, S_PIECE, Z_PIECE, J_PIECE, L_PIECE, O_PIECE]
-        for color in color_to_guess:
+        to_remove = []
+        for color, guess in color_to_guess.items():
             prnt(f"Dist({color}, {color_to_guess[color]}) = {ColorUtil.color_dist(color, color_to_guess[color])}")
-            if color_to_guess[color] == EMPTY:
+            if guess == EMPTY:
                 continue
-            if color_to_guess[color] == GARBAGE:
+            if guess == GARBAGE:
                 assigned_to_garbage = color
-            else:
-                color_pieces.remove(color_to_guess[color])
+            elif ColorUtil.color_dist(color, guess) > 0.13:
+                to_remove.append(color)
 
         if assigned_to_garbage:
             dist = ColorUtil.color_dist(assigned_to_garbage, GARBAGE)
@@ -240,16 +235,38 @@ class ColorUtil:
             if dist > 0.05 and \
                     (abs(assigned_to_garbage[0] - assigned_to_garbage[1]) > 20 or
                      abs(assigned_to_garbage[1] - assigned_to_garbage[2]) > 20):
-                if color_pieces:
-                    possible_color = min(color_pieces, key=lambda c: ColorUtil.color_dist(assigned_to_garbage, c))
-                    if ColorUtil.color_dist(assigned_to_garbage, possible_color) < 0.05:
-                        color_to_guess[assigned_to_garbage] = possible_color
-                    else:
-                        color_to_guess[assigned_to_garbage] = EMPTY
-                else:
-                    color_to_guess[assigned_to_garbage] = EMPTY
-                prnt(f"mis-assigned {assigned_to_garbage} to garbage,"
-                     f" assign back to {color_to_guess[assigned_to_garbage]}")
+                to_remove.append(assigned_to_garbage)
+        return to_remove
+
+    @staticmethod
+    def try_fix_bad_matches(color_to_guess: Dict[Color, Color], colors: List[Color]):
+        """
+        If distance between a color and its attribution is too big,
+         try to re-affect it to another free color with lower distance.
+         Only do it for the worst color match
+        """
+        color_pieces = list(colors)
+        to_reaffect = None
+        dist = 0.1
+        if EMPTY in color_pieces:
+            color_pieces.remove(EMPTY)
+        if GARBAGE in color_pieces:
+            color_pieces.remove(GARBAGE)
+        for color, guess in color_to_guess.items():
+            if guess in (EMPTY, GARBAGE):
+                continue
+            color_pieces.remove(guess)
+            color_dist = ColorUtil.color_dist(color, guess)
+            if color_dist > dist:
+                to_reaffect = color
+                dist = color_dist
+        if to_reaffect and color_pieces:
+            prnt(f"{to_reaffect} is possibly mis-assigned with a dist of {dist}")
+            possible_color = min(color_pieces, key=lambda c: ColorUtil.color_dist(to_reaffect, c))
+            prnt(f"closest new color is {possible_color}, dist {ColorUtil.color_dist(to_reaffect, possible_color)}")
+            if ColorUtil.color_dist(to_reaffect, possible_color) < dist:
+                color_to_guess[to_reaffect] = possible_color
+                prnt(f"mis-assigned {to_reaffect}, assign to {possible_color}")
 
     @staticmethod
     def extract_color_families(grid: np.ndarray[(int, int), Color]) -> Dict[Color, List[Color]]:
@@ -300,23 +317,37 @@ class ColorUtil:
                     possible_garbage = color
 
         if possible_garbage:
+            prnt(f'{possible_garbage} seems to be the garbage color')
             families.remove(possible_garbage)
 
+        current_families = list(families)
         map_color_to_guess = ColorUtil.hungarian_algorithm(colors, families)
-        ColorUtil.fix_misattribution(map_color_to_guess)
+        ColorUtil.try_fix_bad_matches(map_color_to_guess, colors)
+        to_remove = ColorUtil.get_families_to_remove(map_color_to_guess)
+        while to_remove:
+            prnt(f'{to_remove=}')
+            for c in to_remove:
+                current_families.remove(c)
+            prnt(f'Mapping for {current_families=}')
+            map_color_to_guess = ColorUtil.hungarian_algorithm(colors, current_families)
+            ColorUtil.try_fix_bad_matches(map_color_to_guess, colors)
+            to_remove = ColorUtil.get_families_to_remove(map_color_to_guess)
+
+        if len(current_families) > len(colors):
+            map_color_to_guess_with_garbage = ColorUtil.hungarian_algorithm(list(COLORS.keys()), current_families)
+            colors_to_remove = ColorUtil.get_families_to_remove(map_color_to_guess_with_garbage)
+            while len(current_families) > len(colors) and colors_to_remove:
+                prnt(f"{len(current_families) - len(colors)} more colors detected than possible, "
+                     f"trying to remove {colors_to_remove}")
+                for c in colors_to_remove:
+                    current_families.remove(c)
+                map_color_to_guess_with_garbage = ColorUtil.hungarian_algorithm(list(COLORS.keys()), current_families)
+                colors_to_remove = ColorUtil.get_families_to_remove(map_color_to_guess_with_garbage)
+            map_color_to_guess = ColorUtil.hungarian_algorithm(colors, current_families)
 
         if possible_garbage:
             map_color_to_guess[possible_garbage] = GARBAGE
             families.append(possible_garbage)
-        else:
-            prnt("Trying matching with the garbage")
-            map_color_to_guess_with_garbage = ColorUtil.hungarian_algorithm(list(COLORS.keys()), families)
-            ColorUtil.fix_misattribution(map_color_to_guess_with_garbage)
-            delta = ColorUtil.get_delta(map_color_to_guess)
-            delta_with_garbage = ColorUtil.get_delta(map_color_to_guess_with_garbage)
-            prnt(f'{delta_with_garbage=} | {delta=}')
-            if delta_with_garbage < delta:
-                map_color_to_guess = map_color_to_guess_with_garbage
 
         for found_family in map_color_to_guess:
             families.remove(found_family)
