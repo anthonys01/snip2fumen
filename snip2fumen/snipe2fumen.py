@@ -12,7 +12,9 @@ pyperclip
 import sys
 from typing import Optional
 
+import cv2
 import numpy as np
+from PIL import ImageGrab
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtGui import QScreen, QPixmap
@@ -115,6 +117,23 @@ def snipe_and_recog(to_clipboard: bool = True):
     window.show()
     app.aboutToQuit.connect(app.deleteLater)
     sys.exit(app.exec_())
+
+
+def recog_from_clipboard(to_clipboard: bool = True):
+    im = ImageGrab.grabclipboard()
+    if im:
+        im_array = cv2.cvtColor(np.array(im), cv2.COLOR_RGB2BGR)
+        recog.recog_image(im_array, to_clipboard)
+    else:
+        print("No image was found in clipboard")
+
+
+def recog_from_image(image_path: str, to_clipboard: bool = True):
+    im = cv2.imread(image_path)
+    if im is not None:
+        recog.recog_image(im, to_clipboard)
+    else:
+        print(f"Could not find any image at path {image_path}")
 
 
 if __name__ == '__main__':
